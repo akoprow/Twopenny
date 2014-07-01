@@ -16,11 +16,13 @@ Pages = {{
       Coming soon... stay tuned
     </>
 
+  empty_style = []
+
   main_page() =
-    ("Twopenny", unimplemented)
+    ("Twopenny", unimplemented, empty_style)
 
   @client show_new_message(~{newmsg}) =
-    exec([#msgs -<- Msg.render(newmsg, {new})])
+    Dom.transform([#msgs -<- Msg.render(newmsg, {new})])
 
   @client setup_msg_updates(_) =
     chan = Session.make_callback(show_new_message)
@@ -30,54 +32,70 @@ Pages = {{
 
   @client setup_newmsg_box(user)(_) =
     xhtml = WMsgBox.html("msgbox", Msg.create(user, _), MsgFactory.submit)
-    exec([#newmsg <- xhtml])
+    Dom.transform([#newmsg <- xhtml])
 
-  user_page(user : User.ref) =
+  user_page(user_ref : User.ref) =
+    user_string = User.ref_to_string(user_ref)
     content =
-      <>
-        <div class="header">
-          {User.show_photo({size_px=80}, user)}
-          {User.to_string(user)}
-        </>
-        <div id=#newmsg onready={setup_newmsg_box(user)} />
-        <div id=#msgs onready={setup_msg_updates} />
-      </>
-    ("Twopenny :: {User.to_string(user)}", content)
+      match User.get(user_ref) with
+      | {none} ->
+          <div class="error_page">
+            Sorry, but I know of no user <strong>{user_string}</>
+          </>
+      | {some=user} ->
+          <>
+            {User.get_header(user_ref, user)}
+            <div id=#newmsg onready={setup_newmsg_box(user_ref)} />
+            <div class="separator" />
+            <div id=#msgs onready={setup_msg_updates} />
+          </>
+    style = User.get_wallpaper_css(user_ref)
+    ("Twopenny :: {user_string}", content, style)
 
   label_page(label) =
-    ("Twopenny :: {Label.to_string(label)}", unimplemented)
+    ("Twopenny :: {Label.to_string(label)}", unimplemented, empty_style)
 
 }}
 
-css = [ page_css, msg_css, msg_box_css ]
+css = [ page_css, toolbar_css, msg_css, msg_box_css, user_css ]
 
 page_css = css
+  body, html, #page {
+    width: 100%;
+    height: 100%;
+  }
   body {
     margin: 0px;
+    position: relative;
   }
-  html {
+  #page {
+    padding-top: 30px;
+  }
+  #main {
     width: 800px;
     margin: auto;
-    height: 100%;
+    min-height: 700px;
     padding: 15px;
     border-left: 1px dotted black;
     border-right: 1px dotted black;
+    background: #EEE;
+    opacity: .8;
+  }
+  h2 {
+    color: #777;
+     /* FIXME writing helvetica (small 'h') passes syntax checking and is interpreted
+              as un-typed CSS, so goes verbose to the page as font:helvetica;
+              Not cool! */
+    font-family: Helvetica;
+    font-size: 20px;
+    margin: 0px 0px 5px 0px;
   }
   .hidden {
     display: none;
   }
-  .header .image {
-    margin: -15px 0px;
-  }
-  .header {
+  div.separator {
+    margin: 30px -15px;
     border-top: 1px dotted black;
-    border-bottom: 1px dotted black;
-    font-variant: small-caps;
-    font-size: 20pt;
-    height: 50px;
-    margin: 30px -16px;
-    background: #F8F8F8;
-    padding: 0px 15px;
   }
 /* marking external links
   a[rel="external"], a.external {

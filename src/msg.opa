@@ -5,13 +5,19 @@
 
 package mlstate.twopenny
 
-import widgets.dateprinter
+import stdlib.widgets.dateprinter
 
-type Msg.t = private(
+@abstract
+type Msg.t =
    { author: User.ref
    ; content : string
    ; created_at : Date.date
-   })
+   }
+
+@abstract
+type Msg.ref = int
+
+type Msg.map('a) = ordered_map(Msg.ref, 'a, Int.order)
 
 type Msg.segment =
     { text : string }
@@ -19,20 +25,20 @@ type Msg.segment =
   / { url : Uri.uri }
   / { user : User.ref }
 
-@both_implem Msg = {{
+Msg = {{
 
   create(author : User.ref, content : string) : Msg.t =
     msg = { ~author ~content created_at=Date.now() }
-    @wrap(msg)
+    msg
 
   get_creation_date(msg : Msg.t) : Date.date =
-    @unwrap(msg).created_at
+    msg.created_at
 
   get_author(msg : Msg.t) : User.ref =
-    @unwrap(msg).author
+    msg.author
 
   get_content(msg : Msg.t) : string =
-    @unwrap(msg).content
+    msg.content
 
   parse(msg : Msg.t) : list(Msg.segment) =
     word = parser
@@ -64,12 +70,12 @@ type Msg.segment =
        // we add spaces around URLs to avoid collapsing them together with adjacent text
       <> <a href={url}>{Uri.to_string(url)}</> </>
     | ~{ label } -> Label.to_anchor(label)
-    | ~{ user } -> User.to_anchor(user)
+    | ~{ user } -> User.ref_to_anchor(user)
     content = List.map(render_segment, parse(msg))
     date = WDatePrinter.html(WDatePrinter.default_config,
-      uniq(), Msg.get_creation_date(msg))
+      Dom.fresh_id(), Msg.get_creation_date(msg))
     author = Msg.get_author(msg)
-    id = uniq()
+    id = Dom.fresh_id()
     classes = ["msg" | if mode == {new} then ["hidden"] else []]
     ready(_) = match mode with
              | {new} ->
@@ -79,9 +85,9 @@ type Msg.segment =
                  void
              | _ -> void
     <div id={id} class={classes} onready={ready}>
-      {User.show_photo({size_px=48}, author)}
+      {User.show_msg_photo(author)}
       <div class="content">
-        <div class="user">{User.to_anchor(author)}</>
+        <div class="user">{User.ref_to_anchor(author)}</>
         <div class="text">{content}</>
         {match mode with
         | {final}
@@ -89,6 +95,11 @@ type Msg.segment =
         | {preview} -> <></> // don't display date in preview
         }
       </>
+      {match mode with
+      | {preview} -> <span class="preview">Preview</>
+      | {final}
+      | {new} -> <></>
+      }
     </>
 
   // FIXME WDatePrinter -> "now ago" -> "now"
@@ -97,6 +108,7 @@ type Msg.segment =
 msg_css = css
   div{} // FIXME, work-around for CSS parsing
   .msg {
+    position: relative;
     width: 540px;
     min-height: 48px;
     font-size: 14px;
@@ -134,4 +146,14 @@ msg_css = css
   .msg .date {
     font-size: 12px;
     color: #999;
+  }
+  .msg .preview {
+    position: absolute;
+    top: -13px;
+    right: -27px;
+    border: 1px solid #C0CAED;
+    background-color: #D0DAFD;
+    padding: 3px;
+    border-radius: 5px;
+    font-variant: small-caps;
   }

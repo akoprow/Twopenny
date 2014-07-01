@@ -5,6 +5,23 @@
 
 package mlstate.twopenny
 
+/** Users in the system */
+db /users : stringmap(User.t)
+db /users[_]/photo full
+db /users[_]/wallpaper full
+
+/** Messages posted by the users */
+ // msg_ref -> msg
+db /msgs : Msg.map(Msg.t)
+
+/** Messages posted by users */
+ // user -> date -> msg_ref
+db /user_msg : User.map(Date.map(Msg.ref))
+
+/** References to messages mentioning given users */
+ // user -> date -> msg_ref
+db /user_mentions : User.map(Date.map(Msg.ref))
+
 @both_implem Data = {{
 
   new_message(msg) =
@@ -18,3 +35,26 @@ package mlstate.twopenny
 
 
 }}
+
+init_data_store() =
+  match ?/users["mlstate"] with
+  | {none} ->
+      mlstate : User.t =
+        { name       = "OPA by MLstate"
+        ; location   = "Paris, France"
+        ; motto      = "MLstate, creators of the OPA platform for web-development"
+        ; email      = Email.of_string("contact@mlstate.com")
+        ; url        = "http://mlstate.com"
+        ; photo      = some({png = @static_binary_content("img/mlstate.png")})
+        ; passwd     = "9d62e4f6d08f780e5d5e4f30ca3419d6"
+        ; wallpaper  =
+            { img = some({png = @static_binary_content("img/mlstate-bg.png")})
+            ; tile = false
+            ; color = Color.of_string("#155B9C")
+            }
+        }
+      /users["mlstate"] <- mlstate
+  | _ ->
+    void
+
+@server _ = init_data_store()
